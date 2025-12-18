@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<title>Smart To-Do List</title>
+
+<!-- 🧠 FAVICON -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
+
+<style>
+/* ===== THEME VARIABLES ===== */
+:root {
+  --bg: #f4f6f8;
+  --card: #00c3ea;
+  --text: #000;
+  --task-bg: #fff;
+}
+
+body.dark {
+  --bg: #121212;
+  --card: #1e1e1e;
+  --text: #f1f1f1;
+  --task-bg: #2a2a2a;
+}
+
+/* ===== BASE ===== */
+body {
+  font-family: Arial, sans-serif;
+  background: var(--bg);
+  margin: 0;
+  padding: 15px;
+  color: var(--text);
+  transition: background 0.3s, color 0.3s;
+}
+
+.container {
+  max-width: 700px;
+  margin: auto;
+  background: var(--card);
+  padding: 20px;
+  border-radius: 8px;
+  color: white;
+}
+
+h1 {
+  text-align: center;
+}
+
+/* ===== DARK MODE TOGGLE ===== */
+.toggle-theme {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.toggle-theme button {
+  background: #444;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* ===== INPUT ===== */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+input, select, textarea, button {
+  padding: 10px;
+  border-radius: 4px;
+  border: none;
+  font-size: 16px;
+}
+
+#add-task-btn {
+  background: #28a745;
+  color: white;
+}
+
+#export-btn {
+  background: #343a40;
+  color: white;
+  margin-top: 10px;
+}
+
+/* ===== TASK LIST ===== */
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  background: var(--task-bg);
+  color: var(--text);
+  margin-top: 12px;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+/* ===== PRIORITY ===== */
+.priority-low { border-left: 6px solid green; }
+.priority-medium { border-left: 6px solid orange; }
+.priority-high { border-left: 6px solid red; }
+
+.task-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.task-text.completed {
+  text-decoration: line-through;
+  color: gray;
+}
+
+/* ===== BUTTONS ===== */
+.btn {
+  padding: 6px 10px;
+  border-radius: 4px;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.edit-btn { background: purple; }
+.remove-btn { background: red; }
+.toggle-btn { background: #007bff; }
+
+/* ===== COLLAPSIBLE ===== */
+.challenge-box {
+  margin-top: 10px;
+  display: none;
+}
+
+.challenge-box textarea {
+  width: 95%;
+  min-height: 60px;
+  margin-top: 6px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (min-width: 600px) {
+  .input-group {
+    flex-direction: row;
+  }
+  input, select {
+    flex: 1;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>Smart To-Do List by Brain🧠</h1>
+
+  <div class="toggle-theme">
+    <button id="themeToggle">🌙 Toggle Dark Mode</button>
+  </div>
+
+  <p style="text-align:center; font-size:14px;">
+    🔐 Login & cloud sync coming soon
+  </p>
+
+  <div class="input-group">
+    <input id="new-task" placeholder="Enter task">
+    <select id="priority">
+      <option value="low">Low</option>
+      <option value="medium">Medium</option>
+      <option value="high">High</option>
+    </select>
+    <button id="add-task-btn">Add</button>
+  </div>
+
+  <button id="export-btn">Export CSV</button>
+
+  <ul id="task-list"></ul>
+</div>
+
+<script>
+/* ===== ELEMENTS ===== */
+const taskList = document.getElementById('task-list');
+const addTaskBtn = document.getElementById('add-task-btn');
+const exportBtn = document.getElementById('export-btn');
+const newTaskInput = document.getElementById('new-task');
+const themeToggle = document.getElementById('themeToggle');
+
+/* ===== DARK MODE ===== */
+if (localStorage.getItem('theme') === 'dark') {
+  document.body.classList.add('dark');
+}
+
+themeToggle.onclick = () => {
+  document.body.classList.toggle('dark');
+  localStorage.setItem(
+    'theme',
+    document.body.classList.contains('dark') ? 'dark' : 'light'
+  );
+};
+
+/* ===== LOAD ===== */
+document.addEventListener('DOMContentLoaded', loadTasks);
+addTaskBtn.onclick = addTask;
+
+/* ===== ADD TASK ===== */
+function addTask() {
+  const text = newTaskInput.value.trim();
+  const priority = document.getElementById('priority').value;
+
+  if (!text) return alert('Enter a task');
+
+  const task = {
+    id: Date.now(),
+    text,
+    priority,
+    completed: false,
+    challenges: '',
+    solution: ''
+  };
+
+  saveTask(task);
+  addTaskToDOM(task);
+  newTaskInput.value = '';
+}
+
+/* ===== DOM ===== */
+function addTaskToDOM(task) {
+  const li = document.createElement('li');
+  li.className = `priority-${task.priority}`;
+  li.dataset.id = task.id;
+
+  li.innerHTML = `
+    <div class="task-header">
+      <input type="checkbox" ${task.completed ? 'checked' : ''}>
+      <span class="task-text ${task.completed ? 'completed' : ''}">${task.text}</span>
+      <button class="btn toggle-btn">Challenges</button>
+      <button class="btn edit-btn">Edit</button>
+      <button class="btn remove-btn">Remove</button>
+    </div>
+
+    <div class="challenge-box">
+      <label>Challenges:</label>
+      <textarea class="challenge">${task.challenges}</textarea>
+
+      <label>Planned Solution:</label>
+      <textarea class="solution">${task.solution}</textarea>
+    </div>
+  `;
+
+  taskList.appendChild(li);
+}
+
+/* ===== EVENTS ===== */
+taskList.onclick = e => {
+  const li = e.target.closest('li');
+  if (!li) return;
+  const id = li.dataset.id;
+
+  if (e.target.type === 'checkbox') toggleComplete(id, e.target.checked, li);
+  if (e.target.classList.contains('remove-btn')) deleteTask(id, li);
+  if (e.target.classList.contains('edit-btn')) editTask(id, li);
+  if (e.target.classList.contains('toggle-btn')) {
+    const box = li.querySelector('.challenge-box');
+    box.style.display = box.style.display === 'block' ? 'none' : 'block';
+  }
+};
+
+/* ===== STORAGE ===== */
+function getTasks() {
+  return JSON.parse(localStorage.getItem('tasks')) || [];
+}
+
+function saveTask(task) {
+  const tasks = getTasks();
+  tasks.push(task);
+  localStorage.setItem('tasks', JSON.stringify(tasks));
+}
+
+function loadTasks() {
+  getTasks().forEach(addTaskToDOM);
+}
+
+function toggleComplete(id, completed, li) {
+  const tasks = getTasks().map(t => {
+    if (t.id == id) t.completed = completed;
+    return t;
+  });
+  localStorage.setItem('tasks', JSON.stringify(tasks));
+  li.querySelector('.task-text').classList.toggle('completed', completed);
+}
+
+function deleteTask(id, li) {
+  const tasks = getTasks().filter(t => t.id != id);
+  localStorage.setItem('tasks', JSON.stringify(tasks));
+  li.remove();
+}
+
+function editTask(id, li) {
+  const span = li.querySelector('.task-text');
+  const newText = prompt('Edit task:', span.textContent);
+  if (!newText) return;
+
+  span.textContent = newText;
+  const tasks = getTasks().map(t => {
+    if (t.id == id) t.text = newText;
+    return t;
+  });
+  localStorage.setItem('tasks', JSON.stringify(tasks));
+}
+
+/* ===== EXPORT CSV ===== */
+exportBtn.onclick = () => {
+  const tasks = getTasks();
+  let csv = "Task,Priority,Completed,Challenges,Solution\n";
+  tasks.forEach(t => {
+    csv += `"${t.text}","${t.priority}","${t.completed}","${t.challenges}","${t.solution}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'tasks.csv';
+  link.click();
+};
+</script>
+
+</body>
+</html>
